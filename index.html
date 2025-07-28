@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Расчет стоимости доставки</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <script
+      src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&amp;apikey=your key here"
+      +key
+      type="text/javascript"
+    ></script>
+    <script type="text/javascript">
+      ymaps.ready(init);
+      function init() {
+        class ViaPoint {
+          active = false;
+          constructor(name, coords, active = false) {
+            this.name = name;
+            this.coords = coords;
+            this.active = active;
+          }
+        }
+
+        const viaPoints = [
+          new ViaPoint("Бельский мост", [54.71245491, 55.95651602]),
+          new ViaPoint("Каменная переправа", [54.68364749, 55.99994718]),
+          new ViaPoint("Южный обход", [54.67826535, 55.80481731]),
+          new ViaPoint("Восточный выезд", [54.73495717, 56.03029787]),
+          new ViaPoint("Затонское шоссе", [54.75651084, 55.96624832]),
+          new ViaPoint("Шакша", [54.7864844, 56.21922462]),
+          new ViaPoint("Симская", [55.055344, 57.706031]),
+          /*new ViaPoint("Зелёная роща",[54.91922491, 56.08217701]), */
+        ];
+        /*let selectedViaPoint = viaPoints[0];*/
+        let editMode = false;
+        const transitStr = "Выбор транзитных точек";
+        const companyColor = "#0e268b";
+        const sand2 = "Сеяный песок";
+        const toner = "Тонар";
+        const addTransitPointBtnText = "Добавить транзитную точку";
+        const removeTransitPointBtnText = "Удалить транзитную точку";
+        const truck = "Самосвал";
+        const sand = "Песок";
+        const rubbleStone = "Бутовый камень";
+        const lemez = "Лемезы";
+        const pgs = "ПГС";
+        const gravel = "Гравий";
+        const agidel = "Агидель";
+        const yar = "Красный Яр";
+        const m5 = "М5";
+        const kulushevo = "Кулушево";
+        const egorovskiy = "Егоровский";
+        const katavskiy = "Усть-Катавский гранитный карьер";
+        const kazayak = "Казаякский Карьер";
+        const biyankovskiy = "Биянковский щебеночный завод";
+        const satkinskiy = "Саткинский щебзавод";
+        const bakal = "Бакал";
+        const mixPrefix = "Смесь щебеночно-песчаная";
+        const cubePostfix = " (кубовидный)";
+        const orderPostfix = " (производится под заказ)";
+        const shreddedPostfix = " дробленый";
+        const screenedPostfix = " отсев";
+        const clayOver10Postfix = " (с содержанием глинистых частиц более 10%)";
+        const clayOver20Postfix = " (с содержанием глинистых частиц более 20%)";
+        const clayUpTo35Postfix = " (с содержанием глинистых частиц до 35%)";
+        const clayOver35Postfix = " (с содержанием глинистых частиц более 35%)";
+        const RbuChesnok = "РБУ Чесноковка";
+        const RbuMikh = "РБУ Михайловка";
+        let selectedVehicle = toner;
+        let minAmount = 1,
+          maxAmount = 45;
+        let referencePoints;
+        const schebPrefix = "Щебень ф. ";
+
+        let selectedProduct = pgs;
+        const zhbiPoint = "РБУ";
+        /*mode strs///////////////////////////*/
+        const sandMode = "Песок";
+        const zhbiMode = "ЖБИ";
+        const concreteMode = "Бетон";
+        /*mode strs///////////////////////////*/
+
+        const scheb = new Map()
+          .set(020, "ЩПС ф. 0-20")
+          .set(080, "ЩПС ф. 0-80")
+          .set(040, "ЩПС ф. 0-40")
+          .set(70150, schebPrefix + "70-150")
+          .set(4070, schebPrefix + "40-70")
+          .set(2040, schebPrefix + "20-40")
+          .set(04, schebPrefix + "0-4")
+          .set(05, schebPrefix + "0-5")
+          .set(520, schebPrefix + "5-20")
+          .set(2070, schebPrefix + "20-70")
+          .set(48, schebPrefix + "4-8")
+          .set(416, schebPrefix + "4-16")
+          .set(816, schebPrefix + "8-16")
+          .set(520, schebPrefix + "5-20")
+          .set(510, schebPrefix + "5-10")
+          .set(8112, schebPrefix + "8-11,2")
+          .set(1015, schebPrefix + "10-15")
+          .set(11216, schebPrefix + "11,2-16")
+          .set(16224, schebPrefix + "16-22,4")
+          .set(80120, schebPrefix + "80-120")
+          .set(16224, schebPrefix + "16-22,4")
+          .set(16315, schebPrefix + "16-31,5")
+          .set(1663, schebPrefix + "16-63")
+          .set(1520, schebPrefix + "15-20")
+          .set(31563, schebPrefix + "31,5-63");
+        let calculate = () => {
+          console.error("Calculate is not defined");
+        };
+        class Point {
+          name;
+          coords;
+          prices;
+          mode;
+
+          constructor(name, coords, prices, mode) {
+            this.name = name;
+            this.coords = coords;
+            this.prices = prices;
+            this.mode = mode;
+          }
+        }
+        let activeMode = sandMode;
+        let points = GetPoints();
+        let activePoint = points.get(m5);
+        function GetPoints() {
+          let _points;
+          switch (activeMode) {
+            case sandMode: {
+              _points = new Map()
+                .set(
+                  m5,
+                  new Point(
+                    m5,
+                    [54.646228, 55.964341],
+                    new Map()
+                      .set(pgs, 510)
+                      .set(sand, 750)
+                      .set(sand2, 800)
+                      .set(gravel, 690),
+                    sandMode
+                  )
+                )
+                .set(
+                  agidel,
+                  new Point(
+                    agidel,
+                    [54.661613, 55.994163],
+                    new Map().set(pgs, 470).set(sand, 532),
+                    sandMode
+                  )
+                )
+                .set(
+                  kulushevo,
+                  new Point(
+                    kulushevo,
+                    [54.509942, 56.185179],
+                    new Map().set(pgs, 400).set(sand, 600).set(gravel, 500),
+                    sandMode
+                  )
+                )
+                .set(
+                  yar,
+                  new Point(
+                    yar,
+                    [54.912348, 55.975301],
+                    new Map().set(pgs, 350).set(sand, 600).set(gravel, 650),
+                    sandMode
+                  )
+                )
+                .set(
+                  egorovskiy,
+                  new Point(
+                    egorovskiy,
+                    [54.9765, 57.536842],
+                    new Map()
+                      .set(scheb.get(080), 680)
+                      .set(scheb.get(040), 700)
+                      .set(scheb.get(70150), 740)
+                      .set(scheb.get(4070), 760)
+                      .set(scheb.get(2040), 760)
+                      .set(scheb.get(520) + " (I группа)", 780),
+                    sandMode
+                  )
+                )
+                .set(
+                  katavskiy,
+                  new Point(
+                    katavskiy,
+                    [54.926685, 58.106225],
+                    new Map()
+                      .set(scheb.get(04) + shreddedPostfix, 600)
+                      .set(scheb.get(05) + screenedPostfix, 600)
+                      .set(scheb.get(520) + " (I группа)", 830)
+                      .set(scheb.get(2040), 770)
+                      .set(scheb.get(040) + " (С5)", 770)
+                      .set(scheb.get(080) + " (C4)", 770)
+                      .set(scheb.get(2070), 770)
+                      .set(scheb.get(70150), 660)
+                      .set(scheb.get(48) + cubePostfix, 1100)
+                      .set(scheb.get(816) + cubePostfix, 1100)
+                      .set(scheb.get(16315) + cubePostfix, 1100),
+                    sandMode
+                  )
+                )
+                .set(
+                  bakal,
+                  new Point(
+                    bakal,
+                    [54.94972, 58.856184],
+                    new Map()
+                      .set("Отсев дробления фр. 0-5", 500)
+                      .set("Песок дробленый 0-4", 510)
+                      .set(scheb.get(040) + " C5", 610)
+                      .set(scheb.get(080) + " C4", 610)
+                      .set("Смесь щебеночно-песчаная 0-30", 200)
+                      .set(scheb.get(48) + orderPostfix, 1480)
+                      .set(scheb.get(816) + orderPostfix, 1480)
+                      .set(scheb.get(8112) + orderPostfix, 1480)
+                      .set(scheb.get(11216) + orderPostfix, 1480)
+                      .set(scheb.get(16224) + orderPostfix, 1480)
+                      .set(scheb.get(510) + orderPostfix, 1340)
+                      .set(scheb.get(1015) + orderPostfix, 1340)
+                      .set(scheb.get(1520) + orderPostfix, 1340)
+                      .set(scheb.get(520) + " (I группа)", 1000)
+                      .set(scheb.get(520) + " (III-IV группа)", 700)
+                      .set(scheb.get(2040) + orderPostfix, 700)
+                      .set(scheb.get(4070) + orderPostfix, 700)
+                      .set(
+                        "Скальный грунт (с содержанием глины и суглинков) от 0 до 700",
+                        350
+                      ),
+                    sandMode
+                  )
+                )
+                .set(
+                  kazayak,
+                  new Point(
+                    kazayak,
+                    [54.955749, 57.117404],
+                    new Map()
+                      .set("Песок из отсева дробления 0-5 мм", 350)
+                      .set("Песок из отсева дробления крупный 2.5-5 мм", 620)
+                      .set(scheb.get(510), 720)
+                      .set(scheb.get(520) + "(М600)", 720)
+                      .set(scheb.get(520) + "(М800)", 780)
+                      .set(scheb.get(2040), 780)
+                      .set(scheb.get(4070), 770)
+                      .set(scheb.get(80120), 700)
+                      .set(
+                        scheb.get(020) +
+                          "(с содержанием глинистых частиц более 10%)",
+                        220
+                      )
+                      .set("Известняк (некондиционная продукция 0-600 мм)", 440)
+                      .set(
+                        "Некондиционная продукция (известняк) 0-600 мм" +
+                          clayUpTo35Postfix,
+                        300
+                      )
+                      .set(
+                        "Некондиционная продукция (известняк) 0-600 мм" +
+                          clayOver35Postfix,
+                        160
+                      )
+                      .set(scheb.get(080) + " C-4", 700)
+                      .set(scheb.get(080) + " C-4" + clayOver20Postfix, 580)
+                      .set(scheb.get(040) + " C-5", 720)
+                      .set(scheb.get(040) + " C-5" + clayOver20Postfix, 600)
+                      .set(scheb.get(020) + " C-6", 420),
+                    sandMode
+                  )
+                )
+                .set(
+                  biyankovskiy,
+                  new Point(
+                    biyankovskiy,
+                    [55.067353, 57.586632],
+                    new Map()
+                      .set(scheb.get(510), 920)
+                      .set(scheb.get(520), 780)
+                      .set(scheb.get(2040), 630)
+                      .set(scheb.get(4070), 580)
+                      .set(scheb.get(040), 680)
+                      .set(scheb.get(080), 630)
+                      .set("Песок из отсевов дробления 0-5", 350)
+                      .set(scheb.get(48), 990)
+                      .set(scheb.get(416), 920)
+                      .set(scheb.get(816), 920)
+                      .set(scheb.get(16224), 880)
+                      .set(scheb.get(16315), 710)
+                      .set(scheb.get(1663), 650)
+                      .set(scheb.get(31563), 650),
+                    sandMode
+                  )
+                )
+                .set(
+                  satkinskiy,
+                  new Point(
+                    satkinskiy,
+                    [55.032409, 58.982025],
+                    new Map()
+                      .set(scheb.get(48), 800)
+                      .set(scheb.get(816), 800)
+                      .set(scheb.get(520), 800)
+                      .set(scheb.get(16315), 800)
+                      .set("Щебень дробленный фр. 0-4 мм", 450)
+                      .set(scheb.get(05), 450),
+                    sandMode
+                  )
+                )
+                .set(
+                  lemez,
+                  new Point(
+                    lemez,
+                    [54.835339, 57.046883],
+                    new Map().set(rubbleStone, 200),
+                    sandMode
+                  )
+                );
+              calculate = calculateSand;
+              break;
+            }
+            case concreteMode: {
+              _points = new Map()
+                .set(
+                  RbuChesnok,
+                  new Point(
+                    RbuChesnok,
+                    [54.634406, 55.935793],
+                    undefined,
+                    concreteMode
+                  )
+                )
+                .set(
+                  RbuMikh,
+                  new Point(
+                    RbuMikh,
+                    [54.800105, 55.849864],
+                    undefined,
+                    concreteMode
+                  )
+                );
+              calculate = calculateConcrete;
+              break;
+            }
+            case zhbiMode: {
+              _points = new Map().set(
+                zhbiPoint,
+                new Point(zhbiPoint, [54.634109, 55.931281], zhbiMode)
+              );
+              calculate = calculateZhbi;
+              break;
+            }
+          }
+          return _points;
+        }
+        let myPanelControl;
+        (routePanelControl = new ymaps.control.RoutePanel({
+          options: { showHeader: true, title: "Расчёт доставки" },
+        })),
+          (zoomControl = new ymaps.control.ZoomControl({
+            options: {
+              size: "small",
+              float: "none",
+              position: {
+                bottom: document.documentElement.clientHeight / 2,
+                left: 10,
+              },
+            },
+          }));
+        routePanelControl.routePanel.options.set({
+          types: { auto: true },
+          autofocus: false,
+          allowSwitch: false,
+        });
+        routePanelControl.routePanel.state.set({
+          fromEnabled: false,
+          from: [54.646228, 55.96434],
+        });
+        myMap = new ymaps.Map("map", {
+          center: [60.906882, 30.067233],
+          zoom: 15,
+          controls: [zoomControl, routePanelControl],
+        });
+        let amount;
+        updateLayout();
+        /*tags: updateReferencePoints refs refsUpdate*/
+        function updateLayout() {
+          if (myPanelControl != undefined)
+            myMap.controls.remove(myPanelControl);
+          function generateLayoutStr() {
+            let stylesStr = `<style>
+                    .container{
+                      display:flex;
+                      flex-flow:column;
+                      border-radius:15px;
+                      padding:10px;
+                      background-color:${companyColor};
+                      color:white;
+                      margin-top:10px;
+                      margin-bottom: 10px;
+                    }
+                      .bt{
+                        margin: 5px;
+                        background-color:white;
+                        color:black;
+                        border: none;
+                        border-radius:3px;
+                        text-align:center;
+                      }
+                      .bt-active{
+                        background:${companyColor};
+                        border: solid 1px white;
+                        color: white;}
+                        </style>`;
+
+            let mainStr = `<div class = 'container'>Выбор режима<select id = 'modeSelection'>
+                    <option`;
+            if (activeMode == zhbiMode) mainStr += " selected";
+            mainStr += `>ЖБИ</option>
+                    <option`;
+            if (activeMode == concreteMode) mainStr += " selected";
+            mainStr += `>Бетон</option>
+                    <option`;
+            if (activeMode == sandMode) mainStr += " selected";
+            mainStr += `>Песок</option>
+                    </select>`;
+            /*tags: modeHandler handlerMode*/
+            function modeSelectionHandler(e) {
+              switch (e.target.selectedOptions[0].innerHTML) {
+                case zhbiMode: {
+                  activeMode = zhbiMode;
+                  break;
+                }
+                case concreteMode: {
+                  activeMode = concreteMode;
+                  break;
+                }
+                case sandMode: {
+                  activeMode = sandMode;
+                  break;
+                }
+              }
+              points = GetPoints();
+              activePoint = points.get(points.entries().next().value[0]);
+              updateRoute();
+              updateLayout();
+            }
+            switch (activeMode) {
+              case sandMode: {
+                if (selectedVehicle == toner) {
+                  maxAmount = 45;
+                } else if (selectedVehicle == truck) {
+                  maxAmount = 35;
+                }
+
+                mainStr +=
+                  '<div style="display:flex;  font-family:onest; flex-direction:column; background: ' +
+                  companyColor +
+                  '; padding: 10px; border-radius: 5px;">' +
+                  "<div class='menu-element' >Выберите карьер</div><select id = 'btnsQuarry'>";
+
+                points.forEach(function (p) {
+                  if (typeof activePoint != undefined && activePoint == p)
+                    mainStr += "<option selected>" + p.name + "</option>";
+                  else mainStr += "<option>" + p.name + "</option>";
+                });
+                mainStr +=
+                  "</select><div class='horizontal-divider menu-element'>Выберите продукт</div><select id='btnsProduct'>";
+                Array.from(activePoint.prices.keys()).forEach((key) => {
+                  if (selectedProduct == key)
+                    mainStr += "<option selected>" + key + "</option>";
+                  else mainStr += "<option>" + key + "</option>";
+                });
+                mainStr +=
+                  "</select><div class = 'menu-element'>Вид машины</div>" +
+                  "<button class = 'bt btVehicle'>" +
+                  toner +
+                  "</button>" +
+                  "<button class = 'bt btVehicle'>" +
+                  truck +
+                  "</button>" +
+                  "<div class = 'menu-element'>Количество тонн</div>" +
+                  "<select id = 'selector' style='text-align-last:center; border-radius:5px;'>";
+                for (let i = minAmount; i <= maxAmount; i++) {
+                  mainStr += "<option>" + i + "</option>";
+                }
+                mainStr += "</select></div>";
+                /*viaPoints.forEach((p) => {
+                  mainStr += `<button class = 'bt btTransit'>${p.name}</button>`;
+                });*/
+                break;
+              }
+              case concreteMode: {
+                mainStr +=
+                  '<div style="display:flex; font-family:onest; flex-direction:column; background: #0e268b; padding: 10px; border-radius: 5px;">' +
+                  "<div style=color:white;text-align:center; >Выберите РБУ</div>" +
+                  '<button class="bt">РБУ Чесноковка</button>' +
+                  '<button class="bt">РБУ Михайловка</button>' +
+                  "</div>";
+
+                break;
+              }
+              case zhbiMode: {
+                break;
+              }
+            }
+            /*tags: editMode btEditModeToggle btToggleTransit*/
+            mainStr += `
+            <select id = 'transitSelector'>`;
+            viaPoints.forEach((p) => {
+              mainStr += `<option `;
+              if (p.active)
+                mainStr +=
+                  "class = bt-active"; /*todo переместить в обработчик таймера и оттуда вешать bt-active*/
+              mainStr += `>${p.name}</option>`;
+            });
+            mainStr += `</select>
+            <div style='display:flex; flex-direction:column'>
+              <button id = 'btViaPointToggle' class='bt'></button>
+              <button id ='btViaReset' class = 'bt'>Сбросить транзитные точки</button>
+            </div>
+
+            <button id = 'btEditModeToggle' class = 'bt'
+            >Режим редактирования</button>`;
+            /*tags: timers*/
+            let timer = setInterval(() => {
+              let transitSelector = document.getElementById("transitSelector");
+              let modeSelector = document.getElementById("modeSelection");
+              let btEditModeToggle =
+                document.getElementById("btEditModeToggle");
+              let btViaReset = document.getElementById("btViaReset");
+              let btViaPointToggle =
+                document.getElementById("btViaPointToggle");
+
+              if (
+                transitSelector != undefined &&
+                modeSelector != undefined &&
+                btEditModeToggle != undefined &&
+                btViaReset != undefined &&
+                btViaPointToggle != undefined
+              ) {
+                transitSelector.addEventListener(
+                  "input",
+                  transitSelectorHandler
+                );
+                modeSelector.addEventListener("change", modeSelectionHandler);
+                btEditModeToggle.addEventListener("click", (e) => {
+                  /*tags: btEditModeToggleHandler transitToggle toggleTransit editModeHandler режим редактирования*/
+                  let bt = e.target;
+
+                  if (!editMode) {
+                    editMode = true;
+                    btEditModeToggle.classList.add("bt-active");
+                  } else {
+                    editMode = false;
+                    btEditModeToggle.classList.remove("bt-active");
+                  }
+                });
+                btViaReset.addEventListener("click", (e) => {
+                  /*tags: viaResetHandler btViaResetHandler Handler btHandlerReset*/
+                  if (
+                    viaPoints.some((p) => {
+                      return p.active;
+                    })
+                  ) {
+                    viaPoints.forEach((p) => {
+                      if (p.active) p.active = false;
+                    });
+                    editMode = false;
+                    btEditModeToggle.classList.remove("bt-active");
+                    updateRoute();
+                    updateLayout();
+                  }
+                });
+                btViaPointToggle.addEventListener("click", (e) => {
+                  let point = viaPoints.find((p) => {
+                    return (
+                      p.name == transitSelector.selectedOptions[0].innerHTML
+                    );
+                  });
+                  toggleViaPoint(point);
+                });
+
+                if (!editMode) {
+                  btEditModeToggle.classList.remove("bt-active");
+                } else {
+                  btEditModeToggle.classList.add("bt-active");
+                }
+                updateViaPointToggleText();
+
+                function toggleViaPoint(point) {
+                  if (!point.active) point.active = true;
+                  else point.active = false;
+                  transitSelector.selectedOptions[0].classList.toggle(
+                    "bt-active"
+                  );
+                  if (point != undefined) {
+                    updateRoute();
+                  }
+                  updateViaPointToggleText();
+                }
+                clearInterval(timer);
+              }
+            }, 1);
+
+            return mainStr + stylesStr;
+          }
+          /*обработчики | handlers*/
+          function updateViaPointToggleText() {
+            let point = viaPoints.find((p) => {
+              return p.name == transitSelector.selectedOptions[0].innerHTML;
+            });
+
+            if (point.active)
+              btViaPointToggle.innerHTML = removeTransitPointBtnText;
+            else btViaPointToggle.innerHTML = addTransitPointBtnText;
+          }
+          function sandHandlers() {
+            Array.from(document.getElementsByClassName("btVehicle")).forEach(
+              function (bt) {
+                bt.onclick = btHandlerVehicle;
+                if (bt.innerHTML == selectedVehicle)
+                  bt.classList.add("bt-active");
+              }
+            );
+            document
+              .getElementById(
+                "btnsQuarry"
+              ) /*tags: quarryHandler handlerQuarry*/
+              .addEventListener("change", (e) => {
+                activePoint = points.get(e.target.value);
+                updateRoute();
+
+                if (!activePoint.prices.has(selectedProduct)) {
+                  selectedProduct = activePoint.prices.entries().next()
+                    .value[0];
+                }
+              });
+            document
+              .getElementById("btnsProduct")
+              .addEventListener("change", btProductHandler);
+          }
+
+          function concreteHandlers() {
+            let btns = document.getElementsByClassName("bt");
+            btns[0].addEventListener("click", function () {
+              routePanelControl.routePanel.state.set({
+                from: [54.634406, 55.935793],
+              });
+            });
+
+            btns[1].addEventListener("click", function () {
+              routePanelControl.routePanel.state.set({
+                from: [54.800105, 55.849864],
+              });
+            });
+          }
+          /*обработчики | handlers END*/
+          let mainStr = generateLayoutStr();
+          let panel = ymaps.templateLayoutFactory.createClass(mainStr, {
+            build: function () {
+              panel.superclass.build.call(this);
+              this._attachButtonHandlers();
+            },
+            _attachButtonHandlers: () => {
+              switch (activeMode) {
+                case sandMode: {
+                  sandHandlers();
+                  break;
+                }
+                case concreteMode: {
+                  concreteHandlers();
+                  break;
+                }
+              }
+            },
+          });
+
+          Array.from(document.getElementsByClassName("btTransit")).forEach(
+            (b) => {
+              b.classList.remove("bt-active");
+              b.onclick = transitSelectorHandler;
+            }
+          );
+          myPanelControl = new ymaps.control.Button({
+            data: { content: "Панель" },
+            options: { layout: panel },
+          });
+          recalculate();
+          const checkElement = setInterval(() => {
+            /*todo: переместить к таймерам*/
+            const d = document.getElementById("selector");
+            if (d !== null) {
+              clearInterval(checkElement);
+              /*if (amount > maxAmount){amount = maxAmount;
+                      d[0].selected = true;}if (amount == undefined) amount = minAmount;*/
+
+              d.value = amount;
+              d.addEventListener("change", () => {
+                amount = d.value;
+                recalculate();
+              });
+            }
+          }, 1);
+          function btHandlerVehicle(e) {
+            let bt = e.target;
+            bt.classList.add("bt-active");
+            selectedVehicle = bt.innerHTML;
+            let btns = document.getElementsByClassName("btVehicle");
+            Array.from(btns).forEach((bt) => {
+              if (bt.innerHTML == selectedVehicle) {
+                bt.classList.add("bt-active");
+              } else {
+                bt.classList.remove("bt-active");
+              }
+            });
+            recalculate();
+            updateLayout();
+          }
+          /*tags: handlerVia viaHandler transitHandler*/
+          function transitSelectorHandler(e) {
+            updateViaPointToggleText();
+          }
+          myMap.controls.add(myPanelControl, { float: "right" });
+          switch (activeMode) {
+            case sandMode: {
+              Array.from(document.getElementsByClassName("btProduct")).forEach(
+                function (i) {
+                  if (i.innerHTML == selectedProduct)
+                    i.classList.add("bt-active");
+                  else i.classList.remove("bt-active");
+                }
+              );
+              break;
+            }
+          }
+          /*tags: updateLayoutEnd EndLayout End*/
+        }
+        function btProductHandler(e) {
+          selectedProduct = e.target.selectedOptions[0].innerHTML;
+          console.log("Selected product", selectedProduct);
+          document.getElementById("quickProductSelection").innerHTML =
+            selectedProduct;
+          document.getElementById("btnsProduct").innerHTML = selectedProduct;
+          recalculate();
+        }
+        /*пересчитывает цену и выводит строку с вычислениями*/
+        function recalculate() {
+          routePanelControl.routePanel.getRouteAsync().then((route) => {
+            var activeRoute = route.getActiveRoute();
+            if (activeMode == sandMode) {
+              if (selectedVehicle == toner) maxAmount = 45;
+              else if (selectedVehicle == truck) maxAmount = 35;
+
+              if (amount > maxAmount) {
+                amount = maxAmount;
+                document.getElementById("selector").selectedIndex = 0;
+              }
+              if (amount == undefined) {
+                amount = minAmount;
+                document.getElementById("selector").selectedIndex = 0;
+              }
+            }
+            if (activeRoute) {
+              var length = route.getActiveRoute().properties.get("distance");
+              str = calculate(length.value);
+              balloonContentLayout =
+                ymaps.templateLayoutFactory.createClass(str);
+
+              route.options.set(
+                "routeBalloonContentLayout",
+                balloonContentLayout
+              );
+              activeRoute.balloon.open();
+
+              /*для newUiStr (тонары)/*
+              /*let l;
+              setInterval(() => {
+                l = document.querySelectorAll("th");
+                if (l != undefined) {
+                  clearInterval();
+                  l.forEach((e) => {
+                    e.addEventListener("mouseenter", (l) => {
+                      let target = l.target;
+                      target.style.backgroundColor = companyColor;
+                      target.style.color = "white";
+                      target.style.transition = "0.4s";
+                    });
+                    e.addEventListener("mouseout", (l) => {
+                      let target = l.target;
+                      target.style.backgroundColor = "white";
+                      target.style.color = "black";
+                    });
+                  });
+                }
+              }, 1);*/
+            }
+          });
+        }
+        function handleRoute(route) {
+          route.model.setParams({ results: 5 });
+          route.options.set({
+            boundsAutoApply: false,
+            preventDragUpdate: true,
+            wayPointStartIconFillColor: companyColor,
+            routeActiveStrokeColor: "0000ff",
+            routeStrokeColor: "#000000",
+            wayPointFinishIconFillColor: companyColor,
+            pinIconFillColor: companyColor,
+            pinActiveIconFillColor: companyColor,
+          });
+          route.events.add("activeroutechange", recalculate);
+          route.model.events.add("requestsuccess", function () {
+            route.getWayPoints().each(function (wayPoint) {
+              wayPoint.options.set("draggable", false);
+              recalculate();
+            });
+          });
+        }
+        routePanelControl.routePanel
+          .getRouteAsync()
+          .then((r) => handleRoute(r));
+        /*tags: routeUpdate*/
+        function updateRoute(insert) {
+          /*insert - координаты точки которую нужно добавить*/
+
+          routePanelControl.routePanel.getRouteAsync().then((route) => {
+            let referencePoints = route.model.getReferencePoints();
+            if (
+              editMode &&
+              referencePoints.length >= 2 &&
+              insert != undefined
+            ) {
+              let point = viaPoints.find((p) => {
+                return p.coords == insert;
+              });
+              /*if (point != undefined) {
+                point.active = false;
+              } */
+              viaPoints.push(
+                new ViaPoint(
+                  `Пользовательская точка ${viaPoints.length}`,
+                  insert,
+                  true
+                )
+              );
+              updateLayout();
+            }
+
+            console.log("refs before", referencePoints);
+            let last;
+            let first = activePoint.coords;
+            referencePoints.shift();
+
+            if (
+              insert == undefined ||
+              viaPoints.find((p) => {
+                return p.coords == insert;
+              }) != undefined
+            ) {
+              last = referencePoints.pop();
+            } else if (insert != undefined && !editMode) {
+              /*если пришли по clickHandler, то последней точкой будет insert*/
+              last = insert;
+              referencePoints.pop();
+            }
+            viaPoints.forEach((p) => {
+              if (!p.active && referencePoints.includes(p.coords)) {
+                referencePoints.splice(referencePoints.indexOf(p.coords), 1);
+              } else if (p.active && !referencePoints.includes(p.coords)) {
+                referencePoints.push(p.coords);
+              }
+            });
+
+            let indexes = [];
+            referencePoints.unshift(first);
+            referencePoints.push(last);
+            if (referencePoints.length > 2)
+              for (let i = 1; i < referencePoints.length - 1; i++) {
+                indexes.push(i);
+              }
+            console.log("editMode: ", editMode);
+            console.log("first", first);
+            console.log("last", last);
+            console.log("via", viaPoints);
+            console.log("indexes", indexes);
+            console.log("refs:", referencePoints);
+
+            route.model.setReferencePoints(referencePoints, indexes);
+            /*routePanelControl.routePanel.state.set({
+              from: activePoint.coords,
+            });*/
+          });
+        }
+        /*tags: mapClick clickMap mapClickHandler handlerClickMap*/
+        myMap.events.add("click", function (e) {
+          /*routePanelControl.routePanel.state.set({ to: e.get("coords") });*/
+          //console.clear();
+          updateRoute(e.get("coords"));
+        });
+        /*Калькуляторы | calculate*/
+        function calculateSand(length) {
+          /*console.clear();*/
+          const speed = 1000;
+          let deliveryTime;
+          const shiftTime = 600;
+          let salary;
+          let fuel;
+          let dailyConsumption;
+          let routesPerDay;
+          let result;
+          let timeToLoadUnload;
+          if (amount >= 37 || selectedVehicle == toner) {
+            console.log("Формула тонара");
+            timeToLoadUnload = 100;
+            deliveryTime = (length / speed) * 2 + timeToLoadUnload;
+            routesPerDay = shiftTime / deliveryTime;
+            if (routesPerDay * 100 < 111) {
+              routesPerDay = 1;
+            }
+            if (routesPerDay > 2) {
+              routesPerDay = Math.floor(routesPerDay);
+            }
+            salary = 23;
+            fuel = 69;
+            dailyConsumption = 37000;
+            salary *= length / 1000;
+            /*console.log("Зп водителя до округления", salary);*/
+            salary = Math.ceil(salary / 100) * 100;
+            /*console.log("Зп водителя после округления", salary);*/
+            result =
+              dailyConsumption / routesPerDay + (length / 1000) * fuel + salary;
+          } else if (selectedVehicle == truck) {
+            console.log("Формула самосвала");
+
+            timeToLoadUnload = 45;
+            deliveryTime = (length / speed) * 2 + timeToLoadUnload;
+            routesPerDay = shiftTime / deliveryTime;
+            if (routesPerDay > 2) {
+              routesPerDay = Math.floor(routesPerDay);
+            }
+            salary = 5000;
+            fuel = 69;
+            dailyConsumption = 32000;
+            /*/////////////////////////////NEW////////////////////////////*/
+            salary /= routesPerDay;
+            dailyConsumption /= routesPerDay;
+            result = salary + dailyConsumption + (length / 1000) * fuel;
+            /*////////////////////////////////////////////////////////////*/
+            /*OLD
+                  result =
+                    (dailyConsumption + salary) / routesPerDay +
+                    (length / 1000) * fuel; //3663
+                    */
+          }
+          totalResult =
+            result + activePoint.prices.get(selectedProduct) * amount;
+          let timeStr = "Время на маршрут: ";
+          const maxRoutesPerDayStr = "Количество рейсов в день ";
+          const fuelStr = "Стоимость топлива ";
+          const amountStr = "Количество  ";
+          const selectedProductStr = "Выбранный продукт ";
+          const priceWithoutProductStr = "Цена доставки без учёта продукта ";
+          const totalPriceStr = "Итоговая цена ";
+          const pricePerUnitStr = "Стоимость за 1 тонну ";
+          /*console.log(
+                  selectedProductStr +
+                    ": " +
+                    selectedProduct +
+                    "\n" +
+                    "Расстояние " +
+                    length +
+                    "\n" +
+                    fuelStr +
+                    "\n" +
+                    timeStr +
+                    deliveryTime +
+                    "\n" +
+                    amountStr +
+                    ": " +
+                    amount +
+                    "\n" +
+                    pricePerUnitStr +
+                    " " +
+                    selectedProduct +
+                    ": " +
+                    activePoint.prices.get(selectedProduct) +
+                    "\n" +
+                    priceWithoutProductStr +
+                    result +
+                    "\n" +
+                    totalPriceStr +
+                    " " +
+                    totalResult +
+                    "\n" +
+                    maxRoutesPerDayStr +
+                    ": " +
+                    routesPerDay +
+                    "\nМашина: " +
+                    selectedVehicle +
+                    "\nЗа тонну: " +
+                    totalResult / amount +
+                    "\nЗарплата водителя " +
+                    salary
+                );*/
+          /*priceWithoutProductStr += Math.ceil(result);*/
+          /*totalPriceStr += Math.ceil(totalResult);*/
+          tableStyleStr = `<style>th,tr,td{padding:10px;
+            border: 1px solid;
+            border-collapse: collapse;
+            text-align: center;
+            padding-bottom: 10px;}th{writing-mode: vertical-rl;}</style>`;
+          stylesStr =
+            "<style>div{font-family:onest;}#header, td{color:" +
+            companyColor +
+            `;font-weight:700;font-size:15px;text-align:center;padding-bottom:10px;}</style>`;
+
+          /*<table>
+              <tr><th>текст заголовка</th><th>текст заголовка</th></tr> <!--ряд с ячейками заголовков-->
+              <tr><td>данные</td><td>данные</td></tr> <!--ряд с ячейками тела таблицы-->
+              </table>*/
+
+          let newUiStr =
+            `<div id='header'>Расчет доставки</div>
+                            <table style = 'border: 1px solid; border-collapse:collapse;'>
+                          <tr>
+                            <th>Расстояние</th>
+                            <th>${selectedProductStr}</th>
+                            <th>${fuelStr}</th>
+                            <th>${pricePerUnitStr}</th>
+                            <th>${timeStr}</th>
+                            <th>Количество тонн</th>
+                            <th>Техника</th>
+                            <th>${priceWithoutProductStr}</th>
+                            <th>${totalPriceStr}</th>
+                            <th>За тонну</th>
+                          </tr>
+                          <tr>
+                            <td>${Math.ceil(length)}</td>
+                            <td>${selectedProduct}</td>
+                            <td>${fuel}</td>
+                            <td>${activePoint.prices.get(selectedProduct)}</td>
+                            <td>${Math.ceil(deliveryTime)}</td>
+                            <td>${amount}</td>
+                            <td>${selectedVehicle}</td>
+                            <td>${Math.ceil(result)}</td>
+                            <td>${Math.ceil(totalResult)}</td>
+                            <td>${Math.ceil(totalResult / amount)}</td>
+                            </tr>
+                            </table>` +
+            tableStyleStr +
+            stylesStr;
+          let oldUiStr = `<div id='header'>Расчет доставки</div>
+                    <div>Расстояние:${Math.ceil(length / 1000)} км</div>
+                    ${selectedProductStr}:${selectedProduct}`;
+          oldUiStr += `</select></div><div>
+                    ${fuelStr}${fuel}р. за км
+                     </div><div>
+                    ${pricePerUnitStr}: ${activePoint.prices.get(
+            selectedProduct
+          )}р.
+                    </div><div><b>Количество рейсов: </b>${routesPerDay}</div>
+                    <div>
+                    ${timeStr}${Math.ceil(deliveryTime)}мин.</div>
+                    <div>Количество тонн
+                    ${amount}</div>
+                    <div>Техника:
+                    ${selectedVehicle}</div>
+                    <div>
+                    ${priceWithoutProductStr}: ${Math.ceil(result)}р.
+                    </div>
+                    <div>
+                    ${totalPriceStr}: ${Math.ceil(totalResult)}р.
+                    </div>
+                    ${stylesStr}<div>За тонну ${Math.ceil(
+            totalResult / amount
+          )}р.</div>
+                    <div>Зарплата водителя: ${Math.ceil(salary)}р.</div>`;
+          let timer = setInterval(() => {
+            let element = document.getElementById("quickProductSelection");
+            if (element != undefined) {
+              element.addEventListener("change", btProductHandler);
+              clearInterval(timer);
+              console.log("timer released");
+            }
+          });
+
+          /*для newUiStr раскомментить код ниже*/
+          /*let p = setInterval(() => {
+            let l = document.getElementById("header");
+            if (l != null) {
+              clearInterval(p);
+              l.parentElement.parentElement.style.width = "fit-content";
+            }
+          }, 1);*/
+          return oldUiStr;
+        }
+        function calculateConcrete(length) {
+          /*//console.clear();
+          //console.log("Расстояние", length);*/
+          let str = "<table><tr>";
+
+          let result;
+          class Item {
+            distance;
+            price; //цена за 6 кубов
+            //prices;
+
+            constructor(distance, price) {
+              this.distance = distance;
+              this.price = price;
+              /*prices = new Map().set(6,basePrice);
+                    for (let i = 7; i <= 12; i++) {
+                      prices.set(i,basePrice/6*i);
+                    }
+                    console.log(prices);*/
+            }
+          }
+          let arr = [
+            new Item(10, 4000),
+            new Item(15, 4500),
+            new Item(20, 5000),
+            new Item(25, 5500),
+            new Item(30, 6000),
+            new Item(35, 7000),
+          ];
+          let buffer = arr[0];
+          arrPrices = [];
+          let styleStr =
+            "<style>table, td,th{padding:5px;border-collapse: collapse;text-align:center; border:1px solid} p{font-weight:bold; text-align:center}</style>";
+          if (length / 1000 < arr[arr.length - 1].distance) {
+            for (let i = 0; i < arr.length; i++) {
+              if (length < arr[i].distance * 1000) {
+                str +=
+                  "<p>Стоимость доставки до " + arr[i].distance + " км: \n<p>";
+                for (let j = 6; j <= 12; j++) {
+                  str += "<th>" + j + " кубов</th>";
+                  arrPrices.push(Math.round(j * (arr[i].price / 6)));
+                }
+                str += "<tr>";
+                for (let j = 0; j <= arrPrices.length - 1; j++) {
+                  str += "<td>" + arrPrices[j] + "</td>";
+                }
+                str +=
+                  "</tr></table><p>Расстояние: " + Math.ceil(length) + " м</p>";
+
+                return str + styleStr;
+              } else buffer = arr[i];
+            }
+          }
+
+          if (length / 1000 > buffer.distance) {
+            str +=
+              "<p>Стоимость доставки до " +
+              Math.ceil(length / 1000) /*17200*/ +
+              " км: \n<p>";
+            buffer = arr[arr.length - 1];
+            let increment = 200;
+            let sum = 0;
+            for (let i = 35; i <= Math.ceil(length / 1000); i++) {
+              if (Math.ceil(length / 1000) > i) {
+                /*//console.log(Math.round(length / 1000) + ">" + i);*/
+                sum += increment;
+              }
+            }
+            buffer.price += sum;
+            for (let j = 6; j <= 12; j++) {
+              str += "<th>" + j + " кубов:</th>";
+              arrPrices.push(Math.round((buffer.price * j) / 6));
+            }
+            str += "<tr>";
+            for (let k = 0; k < arrPrices.length; k++) {
+              str += "<td>" + arrPrices[k] + "</td>";
+            }
+            str +=
+              "</tr></table>" +
+              "<p>Расстояние: " +
+              Math.ceil(length / 1000) +
+              " км</p>" +
+              styleStr;
+            return str;
+          }
+        }
+        function calculateZhbi(length) {
+          let styleStr = `<style>
+                    table, th, td{
+                      border:1px solid;
+                      border-collapse:collapse;
+                      text-align:center;
+                      padding:5px;
+                    }
+                    div{
+                    text-align:center;
+                    font-weight: bold;
+
+                    }
+                    .selected{
+                      font-weight:bold;
+                      background-color:${companyColor};
+                      color: white;
+
+                    }
+                    @keyframes{
+
+                    }
+                  </style>`;
+          /*//console.log("Расстояние", length);*/
+          class Item {
+            distance;
+            price;
+            constructor(distance, price) {
+              this.distance = distance;
+              this.price = price;
+            }
+          }
+
+          let price = 0;
+          var arr = [
+            new Item(5000, 7000),
+            new Item(10000, 8500),
+            new Item(15000, 9000),
+            new Item(20000, 10500),
+            new Item(25000, 11000),
+            new Item(30000, 12000),
+            new Item(35000, 12500),
+            new Item(40000, 13000),
+            new Item(45000, 13500),
+            new Item(50000, 14000),
+            new Item(55000, 14500),
+          ];
+          /*<table>
+                    <tr><th>текст заголовка</th>
+                      <th>текст заголовка</th>
+                      </tr> <!--ряд с ячейками заголовков-->
+                    <tr>
+                      <td>данные</td><td>данные</td>
+                      </tr> <!--ряд с ячейками тела таблицы-->
+                    </table>*/
+          let str = `<div>Расстояние: ${Math.ceil(
+            length / 1000
+          )} км</div><table>
+                      <tr><th>Расстояние (м)</th>
+                        <th>Стоимость доставки</th>
+                      </tr>`;
+          /*for (let i = 0; i < arr.length - 1; i++) {
+                  str += `<tr><td`;
+                  if (length <= arr[i].distance) {
+                    if (arr[i - 1] != null && length > arr[i - 1].distance) {
+                      str += ` style='font-weight:bold;color:${companyColor}'>
+                      ${arr[i].distance}</td>
+                      <td>${arr[i].price}</td>
+                      </tr>`;
+                    } else if (arr[i - 1] == null)
+                      str += ` style='font-weight:bold;color:${companyColor}'`;
+                  }
+                  //str += ` style='font-weight:bold;color:${companyColor}'`;
+                  //str += `>${arr[i].distance}</td><td>${arr[i].price}</td></tr>`;
+                }*/
+          let prev;
+          arr.forEach((item) => {
+            if (prev != null) {
+              if (length > prev && length <= item.distance)
+                str += `<tr><td class = 'selected'>${item.distance}</td><td class = 'selected'>${item.price}</td></tr>`;
+              else
+                str += `<tr><td>${item.distance}</td><td>${item.price}</td></tr>`;
+            } else if (length <= item.distance)
+              str += `<tr><td class = 'selected'>${item.distance}</td><td class = 'selected'>${item.price}</td></tr>`;
+            prev = item.distance;
+          });
+          /*//console.log(document.getElementsByClassName("length"));
+          //document.getElementsByClassName("length").forEach((item) => {});*/
+          /*От 55 км*/
+          if (length >= 55000) {
+            console.log("от 55 км");
+            /*//str = "<th>Расстояние " + Math.ceil(length / 1000) + " км</th>";*/
+
+            price = 14500;
+            let increment = 250;
+            if (length > 80000) {
+              increment = 220;
+            }
+            for (let i = 55; i < Math.ceil(length / 1000); i++) {
+              if (Math.ceil(length / 1000) > i) price += increment;
+            }
+            /*//console.log("Стоимость до + 10%", price);*/
+            for (let i = 0; i < arr.length - 1; i++)
+              price += (arr[i].price * 10) / 100;
+            /*//str += " Стоимость доставки: " + price + " р";*/
+            /*//return str;*/
+            str += `<tr class = 'selected'><td>${Math.ceil(
+              length
+            )}</td><td >${price}</td></tr>`;
+          } /*До 55 км*/ else {
+            console.log("До 55км");
+            for (let i = 0; i < arr.length; i++) {
+              if (length < arr[i].distance) {
+                /*//console.log("Стоимость до + 20%", arr[i].price);*/
+                /*console.log(
+                        "20% от :" + arr[i].price,
+                        (arr[i].price * 20) / 100
+                      );*/
+                arr[i].price += (arr[i].price * 20) / 100;
+                price = arr[i].price;
+                /*str += `Расстояние (
+                        ${Math.ceil(length)}
+                         м) до
+                        ${arr[i].distance}
+                        " м<th> Стоимость доставки:
+                        ${arr[i].price}
+                         р;`;*/
+              }
+            }
+          }
+          /*//str += `<td>${price} р.</td>`;*/
+          str += "</table><div></div>" + styleStr;
+          /*console.log("str", str);*/
+          return str;
+        }
+        /*Калькуляторы | calculate*/
+      }
+    </script>
+    <style>
+      html,
+      body,
+      #map {
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <!-- <div id="output"></div> -->
+  </body>
+</html>
